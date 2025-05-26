@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { DiaryEntry } from '@/lib/supabase'
 import { format } from 'date-fns'
-import { FaBook, FaPen, FaRegSmile } from 'react-icons/fa'
+import { FaBook, FaPen, FaRegSmile, FaTrash } from 'react-icons/fa'
 
 export default function Home() {
   const [entries, setEntries] = useState<DiaryEntry[]>([])
@@ -12,6 +12,7 @@ export default function Home() {
   const [content, setContent] = useState('')
   const [mood, setMood] = useState('')
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchEntries()
@@ -55,6 +56,27 @@ export default function Home() {
       fetchEntries()
     } catch (error) {
       console.error('Error creating entry:', error)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Are you sure you want to delete this entry? This action cannot be undone.')) {
+      return
+    }
+
+    setDeletingId(id)
+    try {
+      const { error } = await supabase
+        .from('diary_entries')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+      setEntries(entries.filter(entry => entry.id !== id))
+    } catch (error) {
+      console.error('Error deleting entry:', error)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -137,9 +159,23 @@ export default function Home() {
             <article key={entry.id} className="bg-white p-6 rounded-2xl shadow-md border border-purple-100 hover:shadow-lg transition-shadow">
               <div className="flex justify-between items-start mb-3">
                 <h3 className="text-xl font-semibold text-purple-900">{entry.title}</h3>
-                <span className="text-sm text-gray-500 bg-purple-50 px-3 py-1 rounded-full">
-                  {format(new Date(entry.created_at), 'MMMM d, yyyy')}
-                </span>
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm text-gray-500 bg-purple-50 px-3 py-1 rounded-full">
+                    {format(new Date(entry.created_at), 'MMMM d, yyyy')}
+                  </span>
+                  <button
+                    onClick={() => handleDelete(entry.id)}
+                    disabled={deletingId === entry.id}
+                    className="text-red-500 hover:text-red-700 transition-colors p-2 rounded-full hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Delete entry"
+                  >
+                    {deletingId === entry.id ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500"></div>
+                    ) : (
+                      <FaTrash className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <p className="text-sm text-purple-600 mb-3 flex items-center">
                 <FaRegSmile className="mr-2" />
